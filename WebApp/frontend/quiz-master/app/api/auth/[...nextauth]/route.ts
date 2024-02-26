@@ -1,17 +1,17 @@
 import jwtDecode from "jwt-decode";
-import { ISODateString } from "next-auth";
+import { AuthOptions, ISODateString, User } from "next-auth";
 import NextAuth from "next-auth/next";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { Session } from "next-auth";
 import { JWT } from "next-auth/jwt";
-import { User } from "@/types/next-auth";
+
 interface DataToken {
     token: string;
     nbf: ISODateString;
     exp: ISODateString;
     iat: ISODateString;
 }
-const authOptions = {
+const authOptions: AuthOptions = {
     providers: [
         CredentialsProvider({
             // The name to display on the sign in form (e.g. 'Sign in with...')
@@ -36,15 +36,16 @@ const authOptions = {
                     const decode: DataToken = jwtDecode(credentials?.jwt);
                     const parse = JSON.parse(decode.token);
                     const parsed = parse.UserData;
-
+                    console.log("AUTH Authorize line 39: ", parse, parsed);
                     // Assign parsed user to user
                     const user = {
+                        id: parsed.id,
                         name: `${parsed.FirstName} ${parsed.LastName}`,
                         email: parsed.Email,
                         username: parsed.UserName,
                         role: parse.Roles[0].Name,
                     };
-                    console.log("Returning user");
+                    console.log("Returning user", user);
                     return user as any;
                 } catch (error) {
                     console.log(error);
@@ -63,13 +64,23 @@ const authOptions = {
         "04e9d3fbe3c8fbfb7e5f89892751f8c5",
     callbacks: {
         jwt: async ({ token, user }: { token: JWT; user: User }) => {
-            user && (token.user = user);
+            user &&
+                (token.user = {
+                    ...user,
+                    username: "",
+                    role: "",
+                    name: user.name!,
+                    email: user.email!,
+                });
+            console.log("AUTH callback JWT: line 74: ", token, user);
             return token;
         },
-        async signIn({ user }: { user: User }) {
-            return user;
+        signIn: async ({ user }: { user: User }) => {
+            console.log("AUTH callback signIn: line 79: ", user);
+            if (user.name) return true;
+            return false;
         },
-        async session({ session, token }: { session: Session; token: JWT }) {
+        session: ({ session, token }: { session: Session; token: JWT }) => {
             session.user = token.user;
 
             return session;
